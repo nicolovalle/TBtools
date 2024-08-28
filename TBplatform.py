@@ -22,6 +22,26 @@ def cosdeg(x):
 def sindeg(x):
     return np.sin(np.deg2rad(x))
 
+def getModCoo(x,y,facex,facey,opt='string'):
+    print(x,y,facex,facey)
+    
+    xD = 384 - (facex/2-x) * 384/facex  #coordinate from bottom-left corner
+    yD = 338.4 - (facey/2-y) * 338.4/facey  #coordinate from bottom-left corner
+
+    col = int(xD / (384/3))  # from 0
+    row = int(yD / (338.4/12)) # from 0
+
+    xm = xD-(col*384/3) - 0.5*(384/3)
+    ym = yD-(row*338.4/12) - 0.5*(338.4/12)
+
+    if opt=='string':
+        return f"Module ({col+1},{row+1}) position ({round(xm,3)},{round(ym,3)})"
+    else:
+        return col+1, row+1, xm, ym
+
+    
+    
+
 
 class RectangleMoverApp:
     def __init__(self, root):
@@ -68,8 +88,10 @@ class RectangleMoverApp:
         # Display coordinates
         self.plat_label = tk.Label(root, text=f"Platform setting: ({self.plat_x},{self.plat_y}) mm. Angle: ({self.angle_x,self.angle_y}) deg")
         self.spot_label = tk.Label(root, text=f"Resulting in beam hitting at ({-self.beam_spot_x+self.face_x},{-self.beam_spot_y+self.face_y}) mm")
+        self.spot_mod_label = tk.Label(root, text=getModCoo(-self.beam_spot_x+self.face_x, -self.beam_spot_y+self.face_y, self.face_width, self.face_height))
         self.plat_label.pack()
         self.spot_label.pack()
+        self.spot_mod_label.pack()
 
         # Variable to track if "20x" is checked
         self.ten_x = tk.BooleanVar(value=False)
@@ -98,8 +120,8 @@ class RectangleMoverApp:
         self.canvas.delete("beam_spot")
         # Red dot's position is fixed at the center of the initial rectangle position
         self.canvas.create_oval(
-            self.beam_spot_x - 5, self.beam_spot_y - 5,
-            self.beam_spot_x + 5, self.beam_spot_y + 5,
+            self.beam_spot_x - 3, self.beam_spot_y - 3,
+            self.beam_spot_x + 3, self.beam_spot_y + 3,
             outline="red", fill="red", tags="beam_spot"
         )
     
@@ -111,7 +133,8 @@ class RectangleMoverApp:
         self.draw_rectangle()
         self.draw_beam_spot()
         self.plat_label.config(text=f"Platform setting: ({round(self.plat_x,3)},{round(self.plat_y,3)}) mm. Angle: ({round(self.angle_x,3),round(self.angle_y,3)}) deg")
-        self.spot_label.config(text=f"Resulting in beam hitting at ({round(-self.beam_spot_x+self.face_x,3)},{round(-self.beam_spot_y+self.face_y,3)}) mm")
+        self.spot_label.config(text=f"Resulting in beam hitting at ({round(self.beam_spot_x-self.face_x,3)},{round(-self.beam_spot_y+self.face_y,3)}) mm")
+        self.spot_mod_label.config(text=getModCoo(self.beam_spot_x-self.face_x,-self.beam_spot_y+self.face_y,self.face_width,self.face_height))
        
         
     
@@ -169,8 +192,11 @@ class RectangleMoverApp:
         self.plat_y = PLATFORM_Y0
         self.angle_x = ANGLE_X0
         self.angle_y = ANGLE_Y0
+        self.face_width = 384 * cosdeg(self.angle_x)
+        self.face_height = 338.4 * cosdeg(self.angle_y)
         self.beam_spot_x = self.canvas_width // 2
         self.beam_spot_y = self.canvas_height // 2
+        
         self.update_position()
 
     def get_20x(self):
