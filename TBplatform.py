@@ -56,7 +56,7 @@ class RectangleMoverApp:
         
         # Initial position of the calo face
         self.face_x = self.canvas_width // 2 
-        self.face_y = self.canvas_height // 2 + int(self.face_height/(12*2))
+        self.face_y = self.canvas_height // 2 + int(self.face_height/(self.rows*2))
 
         # Angle position
         self.angle_x = ANGLE_X0
@@ -122,22 +122,29 @@ class RectangleMoverApp:
     
     def update_position(self):
         self.face_x = self.canvas_width // 2 + (self.plat_x - PLATFORM_X0) - HALFCALO*sindeg(self.angle_x) + HALFCALO*sindeg(ANGLE_X0)
-        self.face_y = self.canvas_height // 2 + self.face_height // 24 - (self.plat_y - PLATFORM_Y0) + HALFCALO*sindeg(self.angle_y) - HALFCALO*sindeg(ANGLE_Y0)
+        self.face_y = self.canvas_height // 2 + self.face_height // (2*self.rows) - (self.plat_y - PLATFORM_Y0) + HALFCALO*sindeg(self.angle_y) - HALFCALO*sindeg(ANGLE_Y0)
         self.face_width = 384 * cosdeg(self.angle_x)
         self.face_height = 338.4 * cosdeg(self.angle_y)
         x_display = self.beam_spot_x-self.face_x
         y_display = -self.beam_spot_y+self.face_y
         xD = 384 - (self.face_width/2-x_display) * 384/self.face_width  #coordinate from bottom-left corner
         yD = 338.4 - (self.face_height/2-y_display) * 338.4/self.face_height  #coordinate from bottom-left corner
-        self.hit_col = int(xD / (384/3)) # from 0
-        self.hit_row = int(yD / (338.4/12)) # from 0
-        xm = xD-(self.hit_col*384/3) - 0.5*(384/3) # coordinates in the minimodule
-        ym = yD-(self.hit_row*338.4/12) - 0.5*(338.4/12) # coordinates in the minimodule
+        self.hit_col = int(xD / (384/self.cols)) # from 0
+        self.hit_row = int(yD / (338.4/self.rows)) # from 0
+        if xD<0:
+            self.hit_col -= 1
+        if yD<0:
+            self.hit_row -= 1
+        xm = xD-(self.hit_col*384/self.cols) - 0.5*(384/self.cols) # coordinates in the minimodule
+        ym = yD-(self.hit_row*338.4/self.rows) - 0.5*(338.4/self.rows) # coordinates in the minimodule
         self.draw_rectangle()
         self.draw_beam_spot()
         self.plat_label.config(text=f"Platform setting: ({round(self.plat_x,3)},{round(self.plat_y,3)}) mm. Angle: ({round(self.angle_x,3)},{round(self.angle_y,3)}) deg")
         self.spot_label.config(text=f"Resulting in beam hitting at ({round(x_display,3)},{round(y_display,3)}) mm wrt calo x-sec")
-        self.spot_mod_label.config(text=f"Module ({self.hit_col+1},{self.hit_row+1}) at coordinates ({round(xm,3)},{round(ym,3)}) mm wrt its center")
+        if self.hit_col in range(self.cols) and self.hit_row in range(self.rows):
+            self.spot_mod_label.config(text=f"Module ({self.hit_col+1},{self.hit_row+1}) at coordinates ({round(xm,3)},{round(ym,3)}) mm wrt its center")
+        else:
+            self.spot_mod_label.config(text=f"Beam spot out of the calorimeter")
        
         
     
@@ -162,7 +169,7 @@ class RectangleMoverApp:
         self.entry_angle_y0.grid(row=0, column=4, padx=5, pady=5)
 
         # Create "20x" checkbox
-        tk.Checkbutton(button_frame, text="20x", variable=self.ten_x).grid(row=2, column=4, padx=5, pady=5)
+        tk.Checkbutton(button_frame, text="Faster", variable=self.ten_x).grid(row=2, column=4, padx=5, pady=5)
         
         # Create buttons for moving the rectangle
         tk.Button(button_frame, text="Reset and center", command=self.recenter).grid(row=0, column=0, padx=5, pady=5)
@@ -202,39 +209,37 @@ class RectangleMoverApp:
         
         self.update_position()
 
-    def get_20x(self):
-        return 20 if self.ten_x.get() else 1
     
     def move_up(self):
-        self.plat_y += .1*self.get_20x()
+        self.plat_y += .1* (20 if self.ten_x.get() else 1)
         self.update_position()
     
     def move_down(self):
-        self.plat_y -= .1*self.get_20x()
+        self.plat_y -= .1* (20 if self.ten_x.get() else 1)
         self.update_position()
     
     def move_left(self):
-        self.plat_x -= .2*self.get_20x()
+        self.plat_x -= .2* (20 if self.ten_x.get() else 1)
         self.update_position()
     
     def move_right(self):
-        self.plat_x += .2*self.get_20x()
+        self.plat_x += .2* (20 if self.ten_x.get() else 1)
         self.update_position()
 
     def rotate_right(self):
-        self.angle_x += .1*self.get_20x()
+        self.angle_x += .01* (100 if self.ten_x.get() else 1)
         self.update_position()
 
     def rotate_left(self):
-        self.angle_x -= .1*self.get_20x()
+        self.angle_x -= .01* (100 if self.ten_x.get() else 1)
         self.update_position()
 
     def rotate_tailup(self):
-        self.angle_y += .1*self.get_20x()
+        self.angle_y += .01* (100 if self.ten_x.get() else 1)
         self.update_position()
 
     def rotate_taildown(self):
-        self.angle_y -= .1*self.get_20x()
+        self.angle_y -= .01* (100 if self.ten_x.get() else 1)
         self.update_position()
 
 
