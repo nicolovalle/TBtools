@@ -5,6 +5,9 @@ PLATFORM_X0 = 0
 PLATFORM_Y0 = 0
 ANGLE_X0 = 2.5 # positive means clockwise
 ANGLE_Y0 = 2.5 # positive means tail up
+HALFCALO = 1250 + 150 # distance between the face of the calo and the center of the platform
+
+version = "beta"
 
 Info = """
 
@@ -22,24 +25,7 @@ def cosdeg(x):
 def sindeg(x):
     return np.sin(np.deg2rad(x))
 
-def getModCoo(x,y,facex,facey,opt='string'):
-    print(x,y,facex,facey)
-    
-    xD = 384 - (facex/2-x) * 384/facex  #coordinate from bottom-left corner
-    yD = 338.4 - (facey/2-y) * 338.4/facey  #coordinate from bottom-left corner
-
-    col = int(xD / (384/3))  # from 0
-    row = int(yD / (338.4/12)) # from 0
-
-    xm = xD-(col*384/3) - 0.5*(384/3)
-    ym = yD-(row*338.4/12) - 0.5*(338.4/12)
-
-    if opt=='string':
-        return f"Module ({col+1},{row+1}) position ({round(xm,3)},{round(ym,3)})"
-    else:
-        return col+1, row+1, xm, ym
-
-    
+  
     
 
 
@@ -55,11 +41,14 @@ class RectangleMoverApp:
         # Rectangle dimensions
         self.face_width = 384 * cosdeg(PLATFORM_X0)
         self.face_height = 338.4 * cosdeg(PLATFORM_Y0)
-        self.face_length = 2500
         
         # Tower matrix dimensions
         self.rows = 12
         self.cols = 3
+
+        # Initial hit module
+        self.hit_row = 6
+        self.hit_col = 1
 
         # Initial platform position
         self.plat_x = PLATFORM_X0
@@ -86,9 +75,11 @@ class RectangleMoverApp:
         self.draw_beam_spot()
         
         # Display coordinates
-        self.plat_label = tk.Label(root, text=f"Platform setting: ({self.plat_x},{self.plat_y}) mm. Angle: ({self.angle_x,self.angle_y}) deg")
-        self.spot_label = tk.Label(root, text=f"Resulting in beam hitting at ({-self.beam_spot_x+self.face_x},{-self.beam_spot_y+self.face_y}) mm")
-        self.spot_mod_label = tk.Label(root, text=getModCoo(-self.beam_spot_x+self.face_x, -self.beam_spot_y+self.face_y, self.face_width, self.face_height))
+        self.half_calo_label = tk.Label(root, text="")
+        self.plat_label = tk.Label(root, text="WELCOME")
+        self.spot_label = tk.Label(root, text=f"v. {version}")
+        self.spot_mod_label = tk.Label(root, text="")
+        self.half_calo_label.pack()
         self.plat_label.pack()
         self.spot_label.pack()
         self.spot_mod_label.pack()
@@ -114,6 +105,8 @@ class RectangleMoverApp:
                 x2 = x1 + small_rect_width
                 y2 = y1 + small_rect_height
                 color = "lightyellow" if (i==5 and j==1) else "lightblue"
+                if i == self.rows-self.hit_row-1 and j == self.hit_col:
+                    color = "lightgreen"
                 self.canvas.create_rectangle(x1, y1, x2, y2, outline="black", fill=color, tags="rectangle")
     
     def draw_beam_spot(self):
@@ -124,17 +117,27 @@ class RectangleMoverApp:
             self.beam_spot_x + 3, self.beam_spot_y + 3,
             outline="red", fill="red", tags="beam_spot"
         )
+
+
     
     def update_position(self):
-        self.face_x = self.canvas_width // 2 + (self.plat_x - PLATFORM_X0) - 0.5*self.face_length*sindeg(self.angle_x) + 0.5*self.face_length*sindeg(ANGLE_X0)
-        self.face_y = self.canvas_height // 2 + self.face_height // 24 - (self.plat_y - PLATFORM_Y0) + 0.5*self.face_length*sindeg(self.angle_y) - 0.5*self.face_length*sindeg(ANGLE_Y0)
+        self.face_x = self.canvas_width // 2 + (self.plat_x - PLATFORM_X0) - HALFCALO*sindeg(self.angle_x) + HALFCALO*sindeg(ANGLE_X0)
+        self.face_y = self.canvas_height // 2 + self.face_height // 24 - (self.plat_y - PLATFORM_Y0) + HALFCALO*sindeg(self.angle_y) - HALFCALO*sindeg(ANGLE_Y0)
         self.face_width = 384 * cosdeg(self.angle_x)
         self.face_height = 338.4 * cosdeg(self.angle_y)
+        x_display = self.beam_spot_x-self.face_x
+        y_display = -self.beam_spot_y+self.face_y
+        xD = 384 - (self.face_width/2-x_display) * 384/self.face_width  #coordinate from bottom-left corner
+        yD = 338.4 - (self.face_height/2-y_display) * 338.4/self.face_height  #coordinate from bottom-left corner
+        self.hit_col = int(xD / (384/3)) # from 0
+        self.hit_row = int(yD / (338.4/12)) # from 0
+        xm = xD-(self.hit_col*384/3) - 0.5*(384/3) # coordinates in the minimodule
+        ym = yD-(self.hit_row*338.4/12) - 0.5*(338.4/12) # coordinates in the minimodule
         self.draw_rectangle()
         self.draw_beam_spot()
-        self.plat_label.config(text=f"Platform setting: ({round(self.plat_x,3)},{round(self.plat_y,3)}) mm. Angle: ({round(self.angle_x,3),round(self.angle_y,3)}) deg")
-        self.spot_label.config(text=f"Resulting in beam hitting at ({round(self.beam_spot_x-self.face_x,3)},{round(-self.beam_spot_y+self.face_y,3)}) mm")
-        self.spot_mod_label.config(text=getModCoo(self.beam_spot_x-self.face_x,-self.beam_spot_y+self.face_y,self.face_width,self.face_height))
+        self.plat_label.config(text=f"Platform setting: ({round(self.plat_x,3)},{round(self.plat_y,3)}) mm. Angle: ({round(self.angle_x,3)},{round(self.angle_y,3)}) deg")
+        self.spot_label.config(text=f"Resulting in beam hitting at ({round(x_display,3)},{round(y_display,3)}) mm wrt calo x-sec")
+        self.spot_mod_label.config(text=f"Module ({self.hit_col+1},{self.hit_row+1}) at coordinates ({round(xm,3)},{round(ym,3)}) mm wrt its center")
        
         
     
@@ -143,10 +146,10 @@ class RectangleMoverApp:
         button_frame.pack()
 
         # Entry fields for PLATFORM_X0, PLATFORM_Y0, ANGLE_X0, ANGLE_Y0
-        self.entry_plat_x0 = tk.Entry(button_frame, width=10)
-        self.entry_plat_y0 = tk.Entry(button_frame, width=10)
-        self.entry_angle_x0 = tk.Entry(button_frame, width=10)
-        self.entry_angle_y0 = tk.Entry(button_frame, width=10)
+        self.entry_plat_x0 = tk.Entry(button_frame, width=8)
+        self.entry_plat_y0 = tk.Entry(button_frame, width=8)
+        self.entry_angle_x0 = tk.Entry(button_frame, width=5)
+        self.entry_angle_y0 = tk.Entry(button_frame, width=5)
         
         self.entry_plat_x0.insert(0, str(PLATFORM_X0))
         self.entry_plat_y0.insert(0, str(PLATFORM_Y0))
@@ -168,7 +171,7 @@ class RectangleMoverApp:
         tk.Button(button_frame, text="Left", command=self.move_left).grid(row=1, column=2, padx=5, pady=5)
         tk.Button(button_frame, text="Right", command=self.move_right).grid(row=1, column=3, padx=5, pady=5)
 
-        tk.Button(button_frame, text="Clock", command=self.rotate_right).grid(row=2, column=0, padx=5, pady=5)
+        tk.Button(button_frame, text="Clockwise", command=self.rotate_right).grid(row=2, column=0, padx=5, pady=5)
         tk.Button(button_frame, text="Countclk", command=self.rotate_left).grid(row=2, column=1, padx=5, pady=5)
         tk.Button(button_frame, text="Tail up", command=self.rotate_tailup).grid(row=2, column=2, padx=5, pady=5)
         tk.Button(button_frame, text="Tail down", command=self.rotate_taildown).grid(row=2, column=3, padx=5, pady=5)
@@ -248,5 +251,5 @@ print("Press Enter to enjoy (really)")
 input()
 root = tk.Tk()
 app = RectangleMoverApp(root)
-app.update_position()
+#app.update_position()
 root.mainloop()
